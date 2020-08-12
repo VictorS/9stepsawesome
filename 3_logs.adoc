@@ -1,4 +1,4 @@
-= Step 4: Logs
+= Step 3: Logs
 Burr Sutter <burrsuter@gmail.com>
 
 ifndef::imagesdir[:imagesdir: images]
@@ -64,7 +64,8 @@ and if you are running Istio make sure to add the -c to specify your business lo
 
 Another option is kail 
 ----
-$ brew install kail
+$ brew tap boz/repo
+$ brew install boz/repo/kail
 $ kail
 ----
 

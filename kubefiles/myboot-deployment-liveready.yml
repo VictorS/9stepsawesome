@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
@@ -19,9 +19,6 @@ spec:
         image: 9stepsawesome/myboot:v1
         ports:
           - containerPort: 8080
-        envFrom:
-        - configMapRef:
-            name: my-config
         resources:
           requests: 
             memory: "300Mi" 

@@ -1,7 +1,6 @@
-FROM registry.access.redhat.com/ubi7-dev-preview/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 WORKDIR /work/
-COPY target/quarkus-demo-1.0.0-runner /work/quarkus-demo-1.0.0-runner
+COPY target/*-runner /work/application
 RUN chmod 775 /work
 EXPOSE 8080
-ENTRYPOINT [ "./quarkus-demo-1.0.0-runner", "-Xmx8m", "-Xmn8m", "-Xms8m" ]
-# ENTRYPOINT [ "./quarkus-1.0.0-runner", "-Dquarkus.http.host=0.0.0.0",  "-Xmx8m", "-Xmn8m", "-Xms8m", "-Dquarkus.http.io-threads=2", "-Dquarkus.http.worker-threads=2" ]
+CMD ["./application", "-Xmx8m", "-Xmn8m", "-Xms8m"]

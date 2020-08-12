@@ -12,11 +12,15 @@ OpenShift is Red Hat's distribution of Kubernetes
 
 minikube and minishift are essentially equivalent and will be used for the demonstrations/examples below.
 
-These instructions are primarily for Linux & MacOS.  At some point, I do hope to find the time translate them to Windows PowerShell.  
+These instructions are primarily for Linux & MacOS.  At some point, I do hope to find the time translate them to Windows PowerShell. If you are on Linux, for the lines containing `darwin`, change `darwin` to `linux`.
 These instructions have NOT been tested well on Windows Bash.
 
 === Prerequisites
-* Docker for Mac/Windows
+* https://docs.docker.com/docker-for-windows/install/[Docker for Windows]
+or
+* https://docs.docker.com/docker-for-mac/[Docker for Mac]
+and/or
+* https://podman.io/[Podman]
 * bash shell
 * git
 * JDK 
@@ -44,10 +48,10 @@ https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl
 Download & Install Minikube Cluster
 [source,bash]
 ----
-$ curl -Lo minikube https://storage.googleapis.com/minikube/releases/v1.0.0/minikube-darwin-amd64
+$ curl -Lo minikube https://storage.googleapis.com/minikube/releases/v1.4.0/minikube-darwin-amd64
 $ chmod +x minikube 
 # or
-$ brew cask install minikube
+$ brew install minikube
 # if you don't have VirtualBox installed
 $ brew cask install virtualbox
 ----
@@ -71,20 +75,23 @@ Note: "minikube" should be interchangeable with "minishift" in the instructions 
 ----
 #!/bin/bash
 
-export MINIKUBE_HOME=/Users/burrsutter/minikube_1.0.0/bin;
-export PATH=$MINIKUBE_HOME:$PATH
+export MINIKUBE_HOME=/Users/burrsutter/minikube/;
+export PATH=$MINIKUBE_HOME/bin:$PATH
 ----
 
 [source,bash]
 ----
 $ minikube version
-minikube version: v1.0.0
+minikube version: v1.4.0
 # or
 $ minishift version
 minishift v1.33.0+ba29431
 ----
 
 === Create the VM
+
+_Note: in the example below, the eventual VM that is configured and created is called "9steps".  This name needs to be unique if you want to run both minikube and minishift (such as calling the VM itself "minikube" or "minishift".  See also screenshot below which names the two VMs for the command with which they are used)_ 
+
 [source,bash]
 ----
 #!/bin/bash
@@ -164,9 +171,46 @@ brew install kubectx
 
 === Namespaces & Pods
 ----
-$ kubectl get namespaces
+$ kubectl get namespaces <1>
 
 $ kubectl get pod --all-namespaces
+----
+<1> Running this command when using minishift will likely result in the following error due to not having admin rights on the openshift cluster.  To login as an admin so that you can execute the following command and login with admin (password: admin)
+----
+Error from server (Forbidden): namespaces is forbidden: User "developer" cannot list namespaces at the cluster scope: no RBAC policy matched
+
+$ oc login $(minishift dashboard --url | sed 's/\/console//')
+Authentication required for https://192.168.99.104:8443 (openshift)
+Username: admin
+Password: admin
+Login successful.
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+    default
+    kube-dns
+    kube-proxy
+    kube-public
+    kube-system
+  * myproject
+    openshift
+    openshift-apiserver
+    openshift-controller-manager
+    openshift-core-operators
+    openshift-infra
+    openshift-node
+    openshift-service-cert-signer
+    openshift-web-console
+
+Using project "myproject".
+
+----
+
+=== Nodes
+A Kubernetes cluster normally consists of 3 Masters and N Workers.  Minikube and Minishift are all-in-one Master+Worker single VMs
+
+----
+$ kubectl get nodes --show-labels
 ----
 
 === Configure Env for Docker 
@@ -222,9 +266,14 @@ $ kubens default
 # kubens comes with the kubectx tool
 ----
 
-The command "kubectl run" is the fastest way to deploy a pod (think linux container). It is useful during development but NOT recommended for production
+The command "kubectl run" is the fastest way to deploy a pod (think linux container). It is useful during development but NOT recommended for production.  You will receive a deprecation warning.
+
 ----
 $ kubectl run hello-minikube --image=k8s.gcr.io/echoserver:1.10 --port=8080
+
+# Non-deprecated run command is
+# kubectl run hello-minikube --image=k8s.gcr.io/echoserver:1.10 --port=8080 --generator=run-pod/v1
+# but this only results in a single Pod
 ----
 
 It produces a Deployment
@@ -232,6 +281,11 @@ It produces a Deployment
 $ kubectl get deployments
 NAME             DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 hello-minikube   1         1         1            1           7s
+----
+
+which produces a ReplicaSet
+----
+$ kubectl get replicaset
 ----
 
 which produces a Pod
@@ -246,6 +300,7 @@ $ kubectl get pods --all-namespaces
 # and it can be fun to see what labels were applied to your pod
 $ kubectl get pods --show-labels
 ----
+
 
 You create a Service
 ----
@@ -276,6 +331,16 @@ Note: minishift has a slightly different variant on the "service" command
 $ minishift openshift service hello-minikube --url
 # and curl it
 $ curl $(minishift openshift service hello-minikube --url)
+----
+
+You can also get the NodePort using jsonpath
+----
+$ kubectl get service hello-minikube -o jsonpath="{.spec.ports[*].nodePort}"
+----
+
+Or using the "jq" (brew install jq) command line tool to parse the JSON is also a very handy trick
+----
+$ kubectl get service hello-minikube -ojson | jq -r '.spec.ports[].nodePort'
 ----
 
 The Deployment that was generated via your "kubectl run" commamnd actually has a bunch of interesting defaults
@@ -322,6 +387,38 @@ $ kubectl get all
 # or with -n mynamespace
 $ kubectl get all -n default
 ----
+
+----
+$ curl $(minikube --profile 9steps ip):$(kubectl get service hello-minikube -o jsonpath="{.spec.ports[*].nodePort}")
+
+
+Hostname: hello-minikube-56cdb79778-cpbc8
+
+Pod Information:
+	-no pod information available-
+
+Server values:
+	server_version=nginx: 1.13.3 - lua: 10008
+
+Request Information:
+	client_address=172.17.0.1
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://192.168.99.100:8080/
+
+Request Headers:
+	accept=*/*
+	host=192.168.99.100:32570
+	user-agent=curl/7.54.0
+
+Request Body:
+	-no body in request-
+
+----
+
  
 === Clean up
 ----
@@ -362,7 +459,7 @@ and your kubectl configuration goes in a different hidden directory that is norm
 $ cat $HOME/.kube/config
 ----
 
-BUT, based on the change in the 0_setenv_minikube.sh, this directory has been moved, helping to keep your various minikube world's separated
+BUT, based on the change in the 0_setenv_minikube.sh, this directory has been moved by setting an env variable, helping to keep your various minikube worlds separated
 ----
 export KUBECONFIG=$MINIKUBE_HOME/.kube/config
 ----
